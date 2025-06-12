@@ -16,11 +16,15 @@ class URLSessionHTTPClient {
         self.session = session
     }
     
+    struct UnexpectedValuesRepresentation: Error {}
+    
     func get(from url: URL, completion: @escaping (HTTPClientResult) -> Void) {
 //        let url = URL(string: "another-url.com")!
         session.dataTask(with: url) {_, _, error in
             if let error {
                 completion(.failure(error))
+            } else {
+                completion(.failure(UnexpectedValuesRepresentation()))
             }
         }.resume()
     }
@@ -28,9 +32,20 @@ class URLSessionHTTPClient {
 
 class URLSessionHTTPClientTests: XCTestCase {
     
-    func test_getFromURL_performsGETRequestWithURL() {
+    override func setUp() {
+        super.setUp()
         URLProtocolStub.startIntercepetingRequests()
-        let url = URL(string: "http://any-url.com")!
+    }
+    
+    override func tearDown() {
+        super.tearDown()
+        URLProtocolStub.stopIntercepetingRequests()
+    }
+    
+    //16:40
+    
+    func test_getFromURL_performsGETRequestWithURL() {
+        let url = anyURL()
         let exp = expectation(description: "Wait for request")
         
         URLProtocolStub.observeRequests { request in
@@ -39,36 +54,60 @@ class URLSessionHTTPClientTests: XCTestCase {
             exp.fulfill()
         }
         
-        URLSessionHTTPClient().get(from: url) { _ in }
+        makeSUT().get(from: url) { _ in }
         
         wait(for: [exp], timeout: 1.0)
-        URLProtocolStub.stopIntercepetingRequests()
     }
     
     func test_getFromURL_failOnRequestError() {
-        URLProtocolStub.startIntercepetingRequests()
-        
-        let url = URL(string: "http://any-url.com")!
-        let error = NSError(domain: "any error", code: 1)
-        
-        URLProtocolStub.stub(data: nil, response: nil, error: error)
-        let sut = URLSessionHTTPClient()
+        let requestError = NSError(domain: "any error", code: 1)
+        let receivedError = resultErrorFor(data: nil, response: nil, error: requestError)
 
+        XCTAssertEqual((receivedError as? NSError)?.code, requestError.code)
+        XCTAssertEqual((receivedError as? NSError)?.domain, requestError.domain)
+    }
+    
+    //19:34
+    
+    func test_getFromURL_failOnAllNilValues() {
+        XCTAssertNotNil(resultErrorFor(data: nil, response: nil, error: nil))
+    }
+    
+    // MARK: - Helpers
+    
+    private func makeSUT(file: StaticString = #filePath, line: UInt = #line) -> URLSessionHTTPClient {
+        let sut = URLSessionHTTPClient()
+        trackForMemoryLeaks(sut, file: file, line: line)
+        return URLSessionHTTPClient()
+    }
+    
+    private func resultErrorFor(data: Data?,
+                                response: URLResponse?,
+                                error: Error?,
+                                file: StaticString = #filePath,
+                                line: UInt = #line ) -> Error? {
+        URLProtocolStub.stub(data: data, response: response, error: error)
+        
+        let sut = makeSUT(file: file, line: line)
         let exp = expectation(description: "Waiting for completion")
         
-        sut.get(from: url) { result in
+        var receivedError: Error?
+        sut.get(from: anyURL()) { result in
             switch result {
-            case let .failure(receivedError as NSError):
-                XCTAssertEqual(receivedError.domain, error.domain)
-                XCTAssertEqual(receivedError.code, error.code)
+            case let .failure(error):
+                receivedError = error
             default:
-                XCTFail("Expected failure with error \(error), got \(result) instead")
+                XCTFail("Expected failure, got \(result) instead")
             }
             exp.fulfill()
         }
         
         wait(for: [exp], timeout: 1.0)
-        URLProtocolStub.stopIntercepetingRequests()
+        return receivedError
+    }
+    
+    private func anyURL() -> URL {
+        URL(string: "http://any-url.com")!
     }
     
     private class URLProtocolStub: URLProtocol {
