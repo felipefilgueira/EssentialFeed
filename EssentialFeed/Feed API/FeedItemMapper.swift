@@ -21,7 +21,7 @@ internal final class FeedItemMapper {
         let description: String?
         let location: String?
         let image: URL
-        
+         
         var item: FeedItem {
             return FeedItem(id: id,
                             description: description,
@@ -29,7 +29,7 @@ internal final class FeedItemMapper {
                             imageURL: image)
         }
     }
-    
+    //test CI
     private static var OK_200: Int { return 200 }
     
     internal static func map(_ data: Data, from response: HTTPURLResponse) -> RemoteFeedLoader.Result {
