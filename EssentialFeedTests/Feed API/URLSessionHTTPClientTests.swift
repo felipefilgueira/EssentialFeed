@@ -20,9 +20,7 @@ class URLSessionHTTPClientTests: XCTestCase {
         super.tearDown()
         URLProtocolStub.stopIntercepetingRequests()
     }
-    
-    //16:40
-    
+        
     func test_getFromURL_performsGETRequestWithURL() {
         let url = anyURL()
         let exp = expectation(description: "Wait for request")
@@ -38,6 +36,25 @@ class URLSessionHTTPClientTests: XCTestCase {
         wait(for: [exp], timeout: 1.0)
     }
     
+//    func test_getFromURL_performsGETRequestWithURL() {
+//        let url = anyURL()
+//        var receivedRequests = [URLRequest]()
+//        let exp = expectation(description: "Wait for request completion")
+//        
+//        URLProtocolStub.observeRequests { request in
+//            receivedRequests.append(request)
+//
+//        }
+//        
+//        makeSUT().get(from: url) { _ in exp.fulfill() }
+//        
+//        wait(for: [exp], timeout: 1.0)
+//        
+//        XCTAssertEqual(receivedRequests.count, 1)
+//        XCTAssertEqual(receivedRequests.first?.url, url)
+//        XCTAssertEqual(receivedRequests.first?.httpMethod, "GET")
+//    }
+    
     func test_getFromURL_failOnRequestError() {
         let requestError = anyNSError()
         let receivedError = resultErrorFor(data: nil, response: nil, error: requestError)
@@ -46,7 +63,6 @@ class URLSessionHTTPClientTests: XCTestCase {
         XCTAssertEqual((receivedError as? NSError)?.domain, requestError.domain)
     }
     
-    //19:34
     
     func test_getFromURL_failOnAllInvalidRepresentationCase() {
         XCTAssertNotNil(resultErrorFor(data: nil, response: nil, error: nil))
@@ -189,7 +205,7 @@ class URLSessionHTTPClientTests: XCTestCase {
         }
         
         override class func canInit(with request: URLRequest) -> Bool {
-            requestObserver?(request)
+//            requestObserver?(request)
             return true
         }
         
@@ -208,6 +224,11 @@ class URLSessionHTTPClientTests: XCTestCase {
         }
         
         override func startLoading() {
+            if let requestObserver = URLProtocolStub.requestObserver {
+                client?.urlProtocolDidFinishLoading(self)
+                return requestObserver(request)
+            }
+            
             if let data = URLProtocolStub.stub?.data {
                 client?.urlProtocol(self, didLoad: data)
             }
